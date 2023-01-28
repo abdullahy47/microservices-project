@@ -2834,17 +2834,11 @@ pipeline {
                 echo "Creating ECR Repo for ${APP_NAME} app"
                 sh '''
                 aws ecr describe-repositories --region ${AWS_REGION} --repository-name ${APP_REPO_NAME} || \
-                if [[ $(echo $?) -eq 0 ]]
-                    then
-                       	echo "ecr repo already created"
-
-                       else
                          aws ecr create-repository \
                          --repository-name ${APP_REPO_NAME} \
                          --image-scanning-configuration scanOnPush=true \
                          --image-tag-mutability MUTABLE \
                          --region ${AWS_REGION}
-                    fi
                 '''
             }
         }
@@ -3002,4 +2996,131 @@ git push
 git checkout dev
 git merge feature/msp-18
 git push origin dev
+```
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+## MSP 19 - Create a QA Environment on EKS Cluster
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+- Create `feature/msp-19` branch from `dev`.
+
+```bash
+git checkout dev
+git branch feature/msp-19
+git checkout feature/msp-19
+```
+
+- Create a folder for QA environment on EKS cluster setup with the name of `qa-eks-cluster` under `infrastructure` folder.
+
+- Create a `cluster.yaml` file under `infrastructure/qa-eks-cluster` folder.
+
+```yaml
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: petclinic-cluster
+  region: us-east-1
+availabilityZones: ["us-east-1a", "us-east-1b", "us-east-1c"]
+managedNodeGroups:
+  - name: ng-1
+    instanceType: t3a.medium
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 3
+    volumeSize: 8
+```
+
+- Commit the change, then push the script to the remote repo.
+
+```bash
+git add .
+git commit -m 'added cluster.yaml file'
+git push --set-upstream origin feature/msp-19
+git checkout dev
+git merge feature/msp-19
+git push origin dev
+```
+- ### Install eksctl
+
+- Download and extract the latest release of eksctl with the following command.
+
+```bash
+curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+```
+
+- Move the extracted binary to /usr/local/bin.
+
+```bash
+sudo mv /tmp/eksctl /usr/local/bin
+```
+
+- Test that your installation was successful with the following command.
+
+```bash
+eksctl version
+```
+
+### Install kubectl
+
+- Download the Amazon EKS vended kubectl binary.
+
+```bash
+curl -o kubectl https://s3.us-west-2.amazonaws.com/amazon-eks/1.23.7/2022-06-29/bin/linux/amd64/kubectl
+```
+
+- Apply execute permissions to the binary.
+
+```bash
+chmod +x ./kubectl
+```
+
+- Move the kubectl binary to /usr/local/bin.
+
+```bash
+sudo mv kubectl /usr/local/bin
+```
+
+- After you install kubectl , you can verify its version with the following command:
+
+```bash
+kubectl version --short --client
+```
+
+- Switch user to jenkins for creating eks cluster. Execute following commands as `jenkins` user.
+
+```bash
+sudo su - jenkins
+```
+
+- Create a `cluster.yaml` file under `/var/lib/jenkins` folder.
+
+```yaml
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: petclinic-cluster
+  region: us-east-1
+availabilityZones: ["us-east-1a", "us-east-1b", "us-east-1c"]
+managedNodeGroups:
+  - name: ng-1
+    instanceType: t3a.medium
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 3
+    volumeSize: 8
+```
+
+- Create an EKS cluster via `eksctl`. It will take a while.
+
+```bash
+eksctl create cluster -f cluster.yaml
+```
+
+- After the cluster is up, run the following command to install `ingress controller`.
+
+```bash
+export PATH=$PATH:$HOME/bin
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.3.0/deploy/static/provider/cloud/deploy.yaml
 ```
